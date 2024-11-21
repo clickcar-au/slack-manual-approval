@@ -35,6 +35,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(require("@actions/core"));
 const bolt_1 = require("@slack/bolt");
 const web_api_1 = require("@slack/web-api");
+require('dotenv').config(); // Add this line
 const token = process.env.SLACK_BOT_TOKEN || "";
 const signingSecret = process.env.SLACK_SIGNING_SECRET || "";
 const slackAppToken = process.env.SLACK_APP_TOKEN || "";
@@ -129,53 +130,215 @@ function run() {
                     ]
                 });
             }))();
-            app.action('slack-approval-approve', ({ ack, client, body, logger }) => __awaiter(this, void 0, void 0, function* () {
-                var _a, _b, _c;
+            // Handler for the initial "Approve" button click
+            app.action('slack-approval-approve', (_a) => __awaiter(this, [_a], void 0, function* ({ ack, client, body, logger }) {
+                var _b, _c, _d;
                 yield ack();
                 try {
-                    const response_blocks = (_a = body.message) === null || _a === void 0 ? void 0 : _a.blocks;
+                    console.log(body);
+                    const response_blocks = ((_b = body.message) === null || _b === void 0 ? void 0 : _b.blocks) || [];
+                    // Remove the action buttons
                     response_blocks.pop();
+                    // Add a confirmation prompt with "Confirm" and "Cancel" buttons
                     response_blocks.push({
                         'type': 'section',
                         'text': {
                             'type': 'mrkdwn',
-                            'text': `Approved by <@${body.user.id}> `,
+                            'text': `Are you sure you want to *approve* this action?`,
                         },
+                    }, {
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "emoji": true,
+                                    "text": "Confirm"
+                                },
+                                "style": "primary",
+                                "value": "confirm_approve",
+                                "action_id": "slack-approval-confirm-approve"
+                            },
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "emoji": true,
+                                    "text": "Cancel"
+                                },
+                                "style": "danger",
+                                "value": "cancel",
+                                "action_id": "slack-approval-cancel"
+                            }
+                        ]
                     });
                     yield client.chat.update({
-                        channel: ((_b = body.channel) === null || _b === void 0 ? void 0 : _b.id) || "",
-                        ts: ((_c = body.message) === null || _c === void 0 ? void 0 : _c.ts) || "",
+                        channel: ((_c = body.channel) === null || _c === void 0 ? void 0 : _c.id) || "",
+                        ts: ((_d = body.message) === null || _d === void 0 ? void 0 : _d.ts) || "",
                         blocks: response_blocks
                     });
                 }
                 catch (error) {
                     logger.error(error);
                 }
-                process.exit(0);
             }));
-            app.action('slack-approval-reject', ({ ack, client, body, logger }) => __awaiter(this, void 0, void 0, function* () {
-                var _d, _e, _f;
+            // Handler for the initial "Reject" button click
+            app.action('slack-approval-reject', (_a) => __awaiter(this, [_a], void 0, function* ({ ack, client, body, logger }) {
+                var _b, _c, _d;
                 yield ack();
                 try {
-                    const response_blocks = (_d = body.message) === null || _d === void 0 ? void 0 : _d.blocks;
+                    const response_blocks = ((_b = body.message) === null || _b === void 0 ? void 0 : _b.blocks) || [];
+                    // Remove the action buttons
                     response_blocks.pop();
+                    // Add a confirmation prompt with "Confirm" and "Cancel" buttons
                     response_blocks.push({
                         'type': 'section',
                         'text': {
                             'type': 'mrkdwn',
-                            'text': `Rejected by <@${body.user.id}>`,
+                            'text': `Are you sure you want to *reject* this action?`,
                         },
+                    }, {
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "emoji": true,
+                                    "text": "Confirm"
+                                },
+                                "style": "primary",
+                                "value": "confirm_reject",
+                                "action_id": "slack-approval-confirm-reject"
+                            },
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "emoji": true,
+                                    "text": "Cancel"
+                                },
+                                "style": "danger",
+                                "value": "cancel",
+                                "action_id": "slack-approval-cancel"
+                            }
+                        ]
                     });
                     yield client.chat.update({
-                        channel: ((_e = body.channel) === null || _e === void 0 ? void 0 : _e.id) || "",
-                        ts: ((_f = body.message) === null || _f === void 0 ? void 0 : _f.ts) || "",
+                        channel: ((_c = body.channel) === null || _c === void 0 ? void 0 : _c.id) || "",
+                        ts: ((_d = body.message) === null || _d === void 0 ? void 0 : _d.ts) || "",
                         blocks: response_blocks
                     });
                 }
                 catch (error) {
                     logger.error(error);
                 }
-                process.exit(1);
+            }));
+            // Handler for "Confirm" approval
+            app.action('slack-approval-confirm-approve', (_a) => __awaiter(this, [_a], void 0, function* ({ ack, client, body, logger }) {
+                var _b, _c, _d;
+                yield ack();
+                try {
+                    const response_blocks = ((_b = body.message) === null || _b === void 0 ? void 0 : _b.blocks) || [];
+                    // Remove the confirmation prompt and buttons
+                    response_blocks.pop();
+                    response_blocks.pop();
+                    // Add the final approval message
+                    response_blocks.push({
+                        'type': 'section',
+                        'text': {
+                            'type': 'mrkdwn',
+                            'text': `*Approved* by <@${body.user.id}>`,
+                        },
+                    });
+                    yield client.chat.update({
+                        channel: ((_c = body.channel) === null || _c === void 0 ? void 0 : _c.id) || "",
+                        ts: ((_d = body.message) === null || _d === void 0 ? void 0 : _d.ts) || "",
+                        blocks: response_blocks
+                    });
+                    // Exit with success
+                    process.exit(0);
+                }
+                catch (error) {
+                    logger.error(error);
+                }
+            }));
+            // Handler for "Confirm" rejection
+            app.action('slack-approval-confirm-reject', (_a) => __awaiter(this, [_a], void 0, function* ({ ack, client, body, logger }) {
+                var _b, _c, _d;
+                yield ack();
+                try {
+                    const response_blocks = ((_b = body.message) === null || _b === void 0 ? void 0 : _b.blocks) || [];
+                    // Remove the confirmation prompt and buttons
+                    response_blocks.pop();
+                    response_blocks.pop();
+                    // Add the final rejection message
+                    response_blocks.push({
+                        'type': 'section',
+                        'text': {
+                            'type': 'mrkdwn',
+                            'text': `*Rejected* by <@${body.user.id}>`,
+                        },
+                    });
+                    yield client.chat.update({
+                        channel: ((_c = body.channel) === null || _c === void 0 ? void 0 : _c.id) || "",
+                        ts: ((_d = body.message) === null || _d === void 0 ? void 0 : _d.ts) || "",
+                        blocks: response_blocks
+                    });
+                    // Exit with failure
+                    process.exit(1);
+                }
+                catch (error) {
+                    logger.error(error);
+                }
+            }));
+            // Handler for "Cancel" action
+            app.action('slack-approval-cancel', (_a) => __awaiter(this, [_a], void 0, function* ({ ack, client, body, logger }) {
+                var _b, _c, _d;
+                yield ack();
+                try {
+                    const response_blocks = ((_b = body.message) === null || _b === void 0 ? void 0 : _b.blocks) || [];
+                    // Remove the confirmation prompt and buttons
+                    response_blocks.pop();
+                    response_blocks.pop();
+                    // Add back the original "Approve" and "Reject" buttons
+                    response_blocks.push({
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "emoji": true,
+                                    "text": "Approve"
+                                },
+                                "style": "primary",
+                                "value": "approve",
+                                "action_id": "slack-approval-approve"
+                            },
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "emoji": true,
+                                    "text": "Reject"
+                                },
+                                "style": "danger",
+                                "value": "reject",
+                                "action_id": "slack-approval-reject"
+                            }
+                        ]
+                    });
+                    yield client.chat.update({
+                        channel: ((_c = body.channel) === null || _c === void 0 ? void 0 : _c.id) || "",
+                        ts: ((_d = body.message) === null || _d === void 0 ? void 0 : _d.ts) || "",
+                        blocks: response_blocks
+                    });
+                }
+                catch (error) {
+                    logger.error(error);
+                }
             }));
             (() => __awaiter(this, void 0, void 0, function* () {
                 yield app.start(3000);

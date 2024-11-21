@@ -1,9 +1,11 @@
 import * as core from '@actions/core'
 import { App, BlockAction, LogLevel } from '@slack/bolt'
 import { WebClient } from '@slack/web-api'
+require('dotenv').config(); // Add this line
+
 
 const token = process.env.SLACK_BOT_TOKEN || ""
-const signingSecret =  process.env.SLACK_SIGNING_SECRET || ""
+const signingSecret = process.env.SLACK_SIGNING_SECRET || ""
 const slackAppToken = process.env.SLACK_APP_TOKEN || ""
 const channel_id    = process.env.SLACK_CHANNEL_ID || ""
 
@@ -29,8 +31,8 @@ async function run(): Promise<void> {
     const actor      = process.env.GITHUB_ACTOR || "";
 
     (async () => {
-      await web.chat.postMessage({ 
-        channel: channel_id, 
+      await web.chat.postMessage({
+        channel: channel_id,
         text: "GitHub Actions Approval request",
         blocks: [
             {
@@ -100,18 +102,53 @@ async function run(): Promise<void> {
       });
     })();
 
+    // Handler for the initial "Approve" button click
     app.action('slack-approval-approve', async ({ack, client, body, logger}) => {
       await ack();
       try {
-        const response_blocks = (<BlockAction>body).message?.blocks
+        console.log(body);
+        const response_blocks = (<BlockAction>body).message?.blocks || []
+
+        // Remove the action buttons
         response_blocks.pop()
-        response_blocks.push({
-          'type': 'section',
-          'text': {
-            'type': 'mrkdwn',
-            'text': `Approved by <@${body.user.id}> `,
+
+        // Add a confirmation prompt with "Confirm" and "Cancel" buttons
+        response_blocks.push(
+          {
+            'type': 'section',
+            'text': {
+              'type': 'mrkdwn',
+              'text': `Are you sure you want to *approve* this action?`,
+            },
           },
-        })
+          {
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "Confirm"
+                    },
+                    "style": "primary",
+                    "value": "confirm_approve",
+                    "action_id": "slack-approval-confirm-approve"
+                },
+                {
+                    "type": "button",
+                    "text": {
+                            "type": "plain_text",
+                            "emoji": true,
+                            "text": "Cancel"
+                    },
+                    "style": "danger",
+                    "value": "cancel",
+                    "action_id": "slack-approval-cancel"
+                }
+            ]
+          }
+        )
 
         await client.chat.update({
           channel: body.channel?.id || "",
@@ -121,21 +158,166 @@ async function run(): Promise<void> {
       } catch (error) {
         logger.error(error)
       }
-
-      process.exit(0)
     });
 
+    // Handler for the initial "Reject" button click
     app.action('slack-approval-reject', async ({ack, client, body, logger}) => {
       await ack();
       try {
-        const response_blocks = (<BlockAction>body).message?.blocks
+        const response_blocks = (<BlockAction>body).message?.blocks || []
+
+        // Remove the action buttons
         response_blocks.pop()
+
+        // Add a confirmation prompt with "Confirm" and "Cancel" buttons
+        response_blocks.push(
+          {
+            'type': 'section',
+            'text': {
+              'type': 'mrkdwn',
+              'text': `Are you sure you want to *reject* this action?`,
+            },
+          },
+          {
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "Confirm"
+                    },
+                    "style": "primary",
+                    "value": "confirm_reject",
+                    "action_id": "slack-approval-confirm-reject"
+                },
+                {
+                    "type": "button",
+                    "text": {
+                            "type": "plain_text",
+                            "emoji": true,
+                            "text": "Cancel"
+                    },
+                    "style": "danger",
+                    "value": "cancel",
+                    "action_id": "slack-approval-cancel"
+                }
+            ]
+          }
+        )
+
+        await client.chat.update({
+          channel: body.channel?.id || "",
+          ts: (<BlockAction>body).message?.ts || "",
+          blocks: response_blocks
+        })
+      } catch (error) {
+        logger.error(error)
+      }
+    });
+
+    // Handler for "Confirm" approval
+    app.action('slack-approval-confirm-approve', async ({ack, client, body, logger}) => {
+      await ack();
+      try {
+        const response_blocks = (<BlockAction>body).message?.blocks || []
+
+        // Remove the confirmation prompt and buttons
+        response_blocks.pop()
+        response_blocks.pop()
+
+        // Add the final approval message
         response_blocks.push({
           'type': 'section',
           'text': {
             'type': 'mrkdwn',
-            'text': `Rejected by <@${body.user.id}>`,
+            'text': `*Approved* by <@${body.user.id}>`,
           },
+        })
+
+        await client.chat.update({
+          channel: body.channel?.id || "",
+          ts: (<BlockAction>body).message?.ts || "",
+          blocks: response_blocks
+        })
+
+        // Exit with success
+        process.exit(0)
+      } catch (error) {
+        logger.error(error)
+      }
+    });
+
+    // Handler for "Confirm" rejection
+    app.action('slack-approval-confirm-reject', async ({ack, client, body, logger}) => {
+      await ack();
+      try {
+        const response_blocks = (<BlockAction>body).message?.blocks || []
+
+        // Remove the confirmation prompt and buttons
+        response_blocks.pop()
+        response_blocks.pop()
+
+        // Add the final rejection message
+        response_blocks.push({
+          'type': 'section',
+          'text': {
+            'type': 'mrkdwn',
+            'text': `*Rejected* by <@${body.user.id}>`,
+          },
+        })
+
+        await client.chat.update({
+          channel: body.channel?.id || "",
+          ts: (<BlockAction>body).message?.ts || "",
+          blocks: response_blocks
+        })
+
+        // Exit with failure
+        process.exit(1)
+      } catch (error) {
+        logger.error(error)
+      }
+    });
+
+    // Handler for "Cancel" action
+    app.action('slack-approval-cancel', async ({ack, client, body, logger}) => {
+      await ack();
+      try {
+        const response_blocks = (<BlockAction>body).message?.blocks || []
+
+        // Remove the confirmation prompt and buttons
+        response_blocks.pop()
+        response_blocks.pop()
+
+        // Add back the original "Approve" and "Reject" buttons
+        response_blocks.push({
+          "type": "actions",
+          "elements": [
+              {
+                  "type": "button",
+                  "text": {
+                      "type": "plain_text",
+                      "emoji": true,
+                      "text": "Approve"
+                  },
+                  "style": "primary",
+                  "value": "approve",
+                  "action_id": "slack-approval-approve"
+              },
+              {
+                  "type": "button",
+                  "text": {
+                          "type": "plain_text",
+                          "emoji": true,
+                          "text": "Reject"
+                  },
+                  "style": "danger",
+                  "value": "reject",
+                  "action_id": "slack-approval-reject"
+              }
+          ]
         })
 
         await client.chat.update({
@@ -146,8 +328,6 @@ async function run(): Promise<void> {
       } catch (error) {
         logger.error(error)
       }
-
-      process.exit(1)
     });
 
     (async () => {
